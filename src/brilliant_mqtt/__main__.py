@@ -18,7 +18,11 @@ from pathlib import Path
 from typing import NoReturn
 
 from brilliant_mqtt import __version__
-from brilliant_mqtt.ambilight import AmbilightController, GStreamerCameraAdapter
+from brilliant_mqtt.ambilight import (
+    AmbilightController,
+    GStreamerCameraAdapter,
+    retire_ambilight_topics,
+)
 from brilliant_mqtt.bridge import Bridge, HotPollReadTimeout, WriteThrottle
 from brilliant_mqtt.bus import BusStartFencedError, RpcBusAdapter
 from brilliant_mqtt.config import Settings
@@ -386,17 +390,23 @@ async def _run_session(
                 ambilight_controller = AmbilightController(
                     mqtt=mqtt,
                     panel=settings.panel,
-                    camera=GStreamerCameraAdapter(privacy_off=panel_bridge.is_privacy_off),
+                    camera=GStreamerCameraAdapter(
+                        privacy_off=panel_bridge.is_privacy_off,
+                        privacy_epoch=panel_bridge.camera_privacy_epoch,
+                    ),
                     state_path=amb_state_path,
                     default_enabled=False,
                     default_interval_s=settings.ambilight_interval_s,
                     owned_topics=owned_topics,
                     privacy_off=panel_bridge.is_privacy_off,
+                    privacy_epoch=panel_bridge.camera_privacy_epoch,
                 )
                 await ambilight_controller.start()
             except Exception:
-                log.exception("ambilight controller startup failed; continuing without it")
-                ambilight_controller = None
+                log.exception("ambilight controller startup failed; rebuilding session")
+                raise
+        else:
+            await retire_ambilight_topics(mqtt, settings.panel, owned_topics)
 
         tick = settings.hot_poll_seconds if settings.hot_poll_seconds > 0 else _IDLE_TICK_S
         next_resync = time.monotonic() + settings.resync_seconds

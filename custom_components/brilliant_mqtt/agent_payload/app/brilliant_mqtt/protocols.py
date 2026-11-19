@@ -13,7 +13,7 @@ from collections.abc import Awaitable, Callable
 from typing import Protocol
 
 from brilliant_mqtt.commands import VarSet
-from brilliant_mqtt.model import BrilliantDevice
+from brilliant_mqtt.model import BrilliantDevice, CaptureProvenance
 from brilliant_mqtt.write_admission import AdmissionTicket, WriteClass, WriteResult
 
 
@@ -27,6 +27,16 @@ class BusClient(Protocol):
     @property
     def capture_generation(self) -> int:
         """Current source generation, advanced before reconnect callbacks or reads."""
+        ...
+
+    @property
+    def capture_sequence(self) -> int:
+        """Latest source boundary, including captures still awaiting delivery."""
+        ...
+
+    @property
+    def privacy_revocation(self) -> CaptureProvenance | None:
+        """Own-panel denial captured synchronously, before asynchronous delivery."""
         ...
 
     async def start(self) -> None:
